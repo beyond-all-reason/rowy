@@ -26,7 +26,7 @@ export function useAuthUser() {
     // Suspend when currentUser has not been read yet
     (setCurrentUser as any)(new Promise(() => {}));
 
-    const unsubscribe = firebaseAuth.onAuthStateChanged(async (user) => {
+    const unsubscribe = firebaseAuth.onIdTokenChanged(async (user) => {
       setCurrentUser(user);
 
       try {
