@@ -1,10 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useSnackbar } from "notistack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import AddIcon from "@mui/icons-material/Add";
 import SaveAltIcon from "@mui/icons-material/SaveAlt";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ContentPasteIcon from "@mui/icons-material/ContentPaste";
 import {
   ButtonGroup,
   Tooltip,
@@ -35,10 +38,12 @@ import {
   tessellatedPathString,
   strengthVisuals,
 } from "./startbox/geometry";
-import { loadPoly, savePoly } from "./startbox/serialization";
-import { StartboxState, StartboxesState } from "./startbox/state";
+import { savePoly } from "./startbox/serialization";
+import { encodeStartboxesModoption } from "./startbox/modoption";
+import { StartboxesState } from "./startbox/state";
 import { useStartboxDraw } from "./startbox/useStartboxDraw";
 import CreateStartboxMenu from "./startbox/CreateStartboxMenu";
+import PasteModoptionMenu from "./startbox/PasteModoptionMenu";
 
 export type { Startbox } from "./startbox/geometry";
 
@@ -63,9 +68,7 @@ export default function MapStartbox(props: MapStartboxProps) {
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const initStartboxes = props.startboxes || [];
   const [startboxes, setStartboxes] = useState<StartboxesState>(
-    new StartboxesState(
-      initStartboxes.map((box) => new StartboxState(loadPoly(box)))
-    )
+    StartboxesState.fromStartboxes(initStartboxes)
   );
   const selectedElement = useRef<
     | { type: "vertex"; startboxIndex: number; vertexIndex: number }
@@ -79,6 +82,9 @@ export default function MapStartbox(props: MapStartboxProps) {
   const drawRef = useRef(draw);
   drawRef.current = draw;
   const [createAnchor, setCreateAnchor] = useState<HTMLElement | null>(null);
+
+  const [pasteAnchor, setPasteAnchor] = useState<HTMLElement | null>(null);
+  const { enqueueSnackbar } = useSnackbar();
 
   const [deleteStartbox, setDeleteStartbox] = useState<boolean>(false);
   const [deleteVertex, setDeleteVertex] = useState<boolean>(false);
@@ -119,6 +125,24 @@ export default function MapStartbox(props: MapStartboxProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [draw.mode]);
 
+  // The startboxes as they would be stored: what both saving and the
+  // `mapmetadata_startbox_override` modoption value are built from.
+  function currentStartboxes(): Startbox[] {
+    return startboxes.boxes.map((sb) => savePoly(sb.poly));
+  }
+
+  // Copy the boxes as the base64url(zlib(json)) value a lobby host passes to
+  // `!bset mapmetadata_startbox_override`.
+  async function copyModoption() {
+    try {
+      const value = await encodeStartboxesModoption(currentStartboxes());
+      await navigator.clipboard.writeText(value);
+      enqueueSnackbar("Copied modoption value");
+    } catch (e) {
+      enqueueSnackbar(`Failed to copy: ${e}`, { variant: "error" });
+    }
+  }
+
   const changedStartbox =
     initStartboxes.length !== startboxes.boxes.length ||
     initStartboxes.some(
@@ -127,7 +151,7 @@ export default function MapStartbox(props: MapStartboxProps) {
 
   function saveStartboxes() {
     if (props.updatedStartboxes) {
-      props.updatedStartboxes(startboxes.boxes.map((sb) => savePoly(sb.poly)));
+      props.updatedStartboxes(currentStartboxes());
     }
   }
 
@@ -533,6 +557,27 @@ export default function MapStartbox(props: MapStartboxProps) {
               </IconButton>
             </span>
           </Tooltip>
+          <Tooltip title="Copy as modoption value">
+            <span>
+              <IconButton
+                size="small"
+                disabled={startboxes.boxes.length === 0}
+                onClick={copyModoption}
+              >
+                <ContentCopyIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Paste a modoption value">
+            <span>
+              <IconButton
+                size="small"
+                onClick={(e) => setPasteAnchor(e.currentTarget)}
+              >
+                <ContentPasteIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
           {props.updatedStartboxes && (
             <Tooltip title="Save startboxes">
               <span>
@@ -653,6 +698,16 @@ export default function MapStartbox(props: MapStartboxProps) {
             </>
           )}
         </Popover>
+
+        <PasteModoptionMenu
+          anchorEl={pasteAnchor}
+          open={Boolean(pasteAnchor)}
+          onClose={() => setPasteAnchor(null)}
+          onLoad={(boxes) => {
+            setStartboxes(StartboxesState.fromStartboxes(boxes));
+            setSelectedVertex(null);
+          }}
+        />
 
         <Stack direction="row" flexWrap="wrap" style={{ columnGap: "10px" }}>
           {startboxes.boxes.map((startbox, startboxIndex) => (
