@@ -1,11 +1,16 @@
 import {
   Point,
+  Startbox,
   MIN_BOX_SIZE,
   clampPoint,
   pointEqual,
   snapStrength,
 } from "./geometry";
-import { getStartboxString, parseStartboxString } from "./serialization";
+import {
+  getStartboxString,
+  loadPoly,
+  parseStartboxString,
+} from "./serialization";
 
 // Keep a dragged rect corner on its side of the fixed opposite corner, at least
 // MIN_BOX_SIZE away and within 0-200, so the box can't collapse to a line.
@@ -129,6 +134,14 @@ export class StartboxState {
 // Immutable state object for all startboxes
 export class StartboxesState {
   constructor(public readonly boxes: StartboxState[]) {}
+
+  // Lift stored startboxes, which may still use the legacy 2-point rectangle
+  // form, into editor state.
+  static fromStartboxes(startboxes: Startbox[]): StartboxesState {
+    return new StartboxesState(
+      startboxes.map((box) => new StartboxState(loadPoly(box)))
+    );
+  }
 
   update(
     idx: number,
