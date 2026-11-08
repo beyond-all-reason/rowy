@@ -13,6 +13,8 @@ import {
 } from "@src/atoms/tableScope";
 import { IFieldConfig } from "@src/components/fields/types";
 
+const ICON_SIZE = 24;
+
 export interface IContextMenuActions {
   label: string;
   icon: React.ReactNode;
@@ -63,11 +65,11 @@ export const ContextMenuActions: IFieldConfig["contextMenuActions"] = (
             icon: (
               <Thumbnail
                 imageUrl={imgObj.downloadURL}
-                size="100x100"
+                size={ICON_SIZE}
                 objectFit="contain"
                 sx={{
-                  width: 24,
-                  height: 24,
+                  width: ICON_SIZE,
+                  height: ICON_SIZE,
                   boxShadow: (theme) =>
                     `0 0 0 1px ${theme.palette.divider} inset`,
                 }}
@@ -88,11 +90,11 @@ export const ContextMenuActions: IFieldConfig["contextMenuActions"] = (
             icon: (
               <Thumbnail
                 imageUrl={imgObj.downloadURL}
-                size="100x100"
+                size={ICON_SIZE}
                 objectFit="contain"
                 sx={{
-                  width: 24,
-                  height: 24,
+                  width: ICON_SIZE,
+                  height: ICON_SIZE,
                   boxShadow: (theme) =>
                     `0 0 0 1px ${theme.palette.divider} inset`,
                 }}

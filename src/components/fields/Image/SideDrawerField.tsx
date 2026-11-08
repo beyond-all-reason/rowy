@@ -35,10 +35,11 @@ import {
   ResponderProvided,
 } from "react-beautiful-dnd";
 
+const IMG_SIZE = 80;
 const imgSx = {
   position: "relative",
-  width: 80,
-  height: 80,
+  width: IMG_SIZE,
+  height: IMG_SIZE,
   borderRadius: 1,
   // boxShadow: `0 0 0 1px ${theme.palette.divider} inset`,
 
@@ -213,7 +214,7 @@ export default function Image_({
                             >
                               <Thumbnail
                                 imageUrl={image.downloadURL}
-                                size="200x200"
+                                size={IMG_SIZE}
                                 objectFit="contain"
                                 sx={thumbnailSx}
                               />
@@ -255,7 +256,7 @@ export default function Image_({
                             <Box sx={imgSx} className="img">
                               <Thumbnail
                                 imageUrl={image.downloadURL}
-                                size="200x200"
+                                size={IMG_SIZE}
                                 objectFit="contain"
                                 sx={thumbnailSx}
                               />

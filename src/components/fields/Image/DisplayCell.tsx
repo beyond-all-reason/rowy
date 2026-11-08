@@ -11,12 +11,14 @@ import { DEFAULT_ROW_HEIGHT } from "@src/components/Table";
 import { FileValue } from "@src/types/table";
 
 // MULTIPLE
+/** CSS pixel size of the square thumbnail box in a cell. */
+export const imgSize = (rowHeight: number) => rowHeight - 9;
 export const imgSx = (rowHeight: number) => ({
   position: "relative",
   display: "flex",
 
-  width: (theme: Theme) => `calc(${rowHeight}px - ${theme.spacing(1)} - 1px)`,
-  height: (theme: Theme) => `calc(${rowHeight}px - ${theme.spacing(1)} - 1px)`,
+  width: imgSize(rowHeight),
+  height: imgSize(rowHeight),
 
   backgroundSize: "contain",
   backgroundPosition: "center center",
@@ -66,9 +68,6 @@ export default function Image_({ value, tabIndex }: IDisplayCellProps) {
   const [tableSchema] = useAtom(tableSchemaAtom, tableScope);
 
   const rowHeight = tableSchema.rowHeight ?? DEFAULT_ROW_HEIGHT;
-  let thumbnailSize = "100x100";
-  if (rowHeight > 50) thumbnailSize = "200x200";
-  if (rowHeight > 100) thumbnailSize = "400x400";
 
   return (
     <Stack
@@ -90,7 +89,7 @@ export default function Image_({ value, tabIndex }: IDisplayCellProps) {
                 >
                   <Thumbnail
                     imageUrl={file.downloadURL}
-                    size={thumbnailSize}
+                    size={imgSize(rowHeight)}
                     objectFit="contain"
                     sx={thumbnailSx}
                     tabIndex={tabIndex}

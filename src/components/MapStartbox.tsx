@@ -44,6 +44,7 @@ import { StartboxesState } from "./startbox/state";
 import { useStartboxDraw } from "./startbox/useStartboxDraw";
 import CreateStartboxMenu from "./startbox/CreateStartboxMenu";
 import PasteModoptionMenu from "./startbox/PasteModoptionMenu";
+import { useResizedImage } from "@src/hooks/useResizedImage";
 
 export type { Startbox } from "./startbox/geometry";
 
@@ -242,11 +243,16 @@ export default function MapStartbox(props: MapStartboxProps) {
     resizeObserver.current.disconnect();
   }, []);
 
+  // The read-only view (table cell) loads a texture resized to the displayed
+  // size; the editor keeps the full-resolution original.
+  const texture = useResizedImage(props.textureUrl, !props.editable);
+
   const mapView = (
     <>
       <div style={{ position: "absolute", width: "100%", height: "100%" }}>
         <img
-          src={props.textureUrl}
+          src={texture.src}
+          onError={texture.onError}
           style={{
             width: "100%",
             height: "100%",
@@ -301,7 +307,7 @@ export default function MapStartbox(props: MapStartboxProps) {
             height={200}
             x={0}
             y={0}
-            href={props.textureUrl}
+            href={texture.src}
             preserveAspectRatio="none"
           ></image>
           <g style={{ pointerEvents: draw.mode ? "none" : undefined }}>
@@ -770,6 +776,7 @@ export default function MapStartbox(props: MapStartboxProps) {
 
   return (
     <div
+      ref={texture.ref}
       style={{
         width: "100%",
         height: "100%",

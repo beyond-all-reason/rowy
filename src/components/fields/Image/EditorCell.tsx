@@ -14,7 +14,7 @@ import { projectScope, confirmDialogAtom } from "@src/atoms/projectScope";
 import { FileValue } from "@src/types/table";
 import useFileUpload from "@src/components/fields/File/useFileUpload";
 import { IMAGE_MIME_TYPES } from "./index";
-import { imgSx, thumbnailSx, deleteImgHoverSx } from "./DisplayCell";
+import { imgSx, imgSize, thumbnailSx, deleteImgHoverSx } from "./DisplayCell";
 
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import {
@@ -79,10 +79,6 @@ export default function Image_({
 
     handleUpdate([...newValue]);
   };
-
-  let thumbnailSize = "100x100";
-  if (rowHeight > 50) thumbnailSize = "200x200";
-  if (rowHeight > 100) thumbnailSize = "400x400";
 
   return (
     <Stack
@@ -176,7 +172,7 @@ export default function Image_({
                           >
                             <Thumbnail
                               imageUrl={file.downloadURL}
-                              size={thumbnailSize}
+                              size={imgSize(rowHeight)}
                               objectFit="contain"
                               sx={thumbnailSx}
                             />

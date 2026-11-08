@@ -39,6 +39,7 @@ import { MapDimensions, clampToBounds } from "./startpos/geometry";
 import { StartPosState } from "./startpos/state";
 import { loadStartPos, saveStartPos } from "./startpos/serialization";
 import { validateStartPos } from "./startpos/validation";
+import { useResizedImage } from "@src/hooks/useResizedImage";
 
 export interface MapStartPosProps {
   textureUrl: string;
@@ -347,6 +348,10 @@ export default function MapStartPos(props: MapStartPosProps) {
     };
   }
 
+  // The read-only view (table cell) loads a texture resized to the displayed
+  // size; the editor keeps the full-resolution original for zooming in.
+  const texture = useResizedImage(props.textureUrl, !props.editable);
+
   const mapView = (
     <svg
       ref={attachSvg}
@@ -370,7 +375,8 @@ export default function MapStartPos(props: MapStartPosProps) {
         height={H}
         x={0}
         y={0}
-        href={props.textureUrl}
+        href={texture.src}
+        onError={texture.onError}
         preserveAspectRatio="none"
       />
       {Array.from(baseOf.entries()).map(([base, { spawn, sideIdx }]) => {
@@ -540,6 +546,7 @@ export default function MapStartPos(props: MapStartPosProps) {
         }}
       >
         <div
+          ref={texture.ref}
           style={{
             position: "relative",
             height: "100%",
