@@ -152,7 +152,7 @@ export default function NewColumnModal({
                 name: columnLabel,
                 fieldName: fieldKey,
                 key: fieldKey,
-                config: {},
+                config: getFieldProp("defaultConfig", type) ?? {},
               },
               index: columnModal!.index,
             });

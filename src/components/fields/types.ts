@@ -33,6 +33,8 @@ export interface IFieldConfig {
   SideDrawerField: React.ComponentType<ISideDrawerFieldProps>;
   settings?: React.ComponentType<ISettingsProps>;
   settingsValidator?: (config: Record<string, any>) => Record<string, string>;
+  /** Seeded into a new column's `config` when a column of this type is created */
+  defaultConfig?: Record<string, any>;
   filter?: {
     operators: IFilterOperator[];
     customInput?: React.ComponentType<IFilterCustomInputProps>;

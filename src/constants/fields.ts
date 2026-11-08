@@ -55,4 +55,5 @@ export enum FieldType {
   last = "LAST",
   // BAR CUSTOM
   mapStartbox = "MAP_STARTBOX",
+  mapStartPos = "MAP_STARTPOS",
 }
