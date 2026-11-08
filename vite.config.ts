@@ -10,7 +10,8 @@ export default defineConfig({
     // respecting the 'module' field in package.json without specifying it explicitly
     mainFields: ["module", "jsnext:main", "jsnext"],
     alias: {
-      path: "rollup-plugin-node-polyfills/polyfills/path",
+      // monaco-editor-auto-typings imports "path"
+      path: "path-browserify",
     },
   },
   plugins: [
