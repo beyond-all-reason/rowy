@@ -1,4 +1,4 @@
-import { Position, Positions, Start, TeamConf, StartPos } from "./types";
+import { Position, Positions, Side, Start, TeamConf, StartPos } from "./types";
 
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v));
@@ -149,13 +149,49 @@ export class StartPosState {
       const start: Start = { spawnPoint: spawnName };
       if (carried?.role) start.role = carried.role;
       if (carried?.baseCenter) start.baseCenter = carried.baseCenter;
+      // A position is either a spawn or a base center within a config, so
+      // turning it into a spawn releases it from whichever start used it.
+      for (const s of sides) {
+        s.starts = s.starts.map((st) =>
+          st.baseCenter === spawnName
+            ? normalizeStart({ ...st, baseCenter: undefined })
+            : st
+        );
+      }
       sides[sideIdx] = { starts: [...sides[sideIdx].starts, start] };
     }
 
-    return new StartPosState(
-      this.positions,
-      this.team.map((t, i) => (i === configIdx ? { ...t, sides } : t))
-    );
+    return this.withSides(configIdx, sides);
+  }
+
+  // Point a spawn's baseCenter at another position (or clear it). Within a
+  // config a base center is exclusively a base center: it's dropped as a
+  // spawn (with its team/role) and taken away from any other start using it.
+  setBaseCenter(
+    configIdx: number,
+    spawnName: string,
+    baseName: string | undefined
+  ): StartPosState {
+    const team = this.team[configIdx];
+    if (!team || baseName === spawnName) return this;
+
+    const sides = team.sides.map((s) => ({
+      starts: s.starts
+        .filter((st) => !baseName || st.spawnPoint !== baseName)
+        .map((st) => {
+          if (st.spawnPoint === spawnName)
+            return normalizeStart({ ...st, baseCenter: baseName });
+          if (baseName && st.baseCenter === baseName)
+            return normalizeStart({ ...st, baseCenter: undefined });
+          return st;
+        }),
+    }));
+
+    return this.withSides(configIdx, sides);
+  }
+
+  private withSides(configIdx: number, sides: Side[]): StartPosState {
+    return this.updateTeam(configIdx, (t) => ({ ...t, sides }));
   }
 
   setStart(

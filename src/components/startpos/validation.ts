@@ -23,6 +23,22 @@ export function validateStartPos(sp: StartPos): ConfigError[] {
     if (team.teamCount !== team.sides.length)
       add(`Needs ${team.teamCount} teams but has ${team.sides.length}`);
 
+    // Within a config a position is either a spawn or the base center of a
+    // single start, never both.
+    const spawns = new Set(
+      team.sides.flatMap((s) => s.starts.map((st) => st.spawnPoint))
+    );
+    const bases = new Set<string>();
+    team.sides.forEach((side) =>
+      side.starts.forEach((start) => {
+        const b = start.baseCenter;
+        if (!b) return;
+        if (spawns.has(b)) add(`"${b}" is both a start position and a base`);
+        else if (bases.has(b)) add(`"${b}" is the base of multiple starts`);
+        bases.add(b);
+      })
+    );
+
     team.sides.forEach((side, si) => {
       const short = team.playersPerTeam - side.starts.length;
       const n = Math.abs(short);

@@ -195,6 +195,20 @@ export default function MapStartPos(props: MapStartPosProps) {
     })
   );
 
+  // For the active config, map each base center -> the spawn that owns it.
+  const baseOf = new Map<string, { spawn: string; sideIdx: number }>();
+  spawnUse.forEach((use, spawn) => {
+    if (use.baseCenter && use.baseCenter in state.positions)
+      baseOf.set(use.baseCenter, { spawn, sideIdx: use.sideIdx });
+  });
+
+  // Off-map positions are drawn pinned to the nearest edge.
+  const displayPos = (name: string): Position => {
+    const p = state.positions[name];
+    const oob = p.x < 0 || p.x > W || p.y < 0 || p.y > H;
+    return oob ? clampToBounds(p, dimensions) : p;
+  };
+
   useEffect(() => {
     if (selected && !(selected.name in state.positions)) setSelected(null);
   }, [state, selected]);
@@ -336,10 +350,51 @@ export default function MapStartPos(props: MapStartPosProps) {
         href={props.textureUrl}
         preserveAspectRatio="none"
       />
+      {Array.from(baseOf.entries()).map(([base, { spawn, sideIdx }]) => {
+        // Arrow from the spawn's circle edge to the base center's circle edge.
+        const a = displayPos(spawn);
+        const b = displayPos(base);
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy);
+        const head = R * 0.45;
+        if (len <= 2 * R + head) return null;
+        const ux = dx / len;
+        const uy = dy / len;
+        const x1 = a.x + ux * R;
+        const y1 = a.y + uy * R;
+        const tipX = b.x - ux * R;
+        const tipY = b.y - uy * R;
+        const baseX = tipX - ux * head;
+        const baseY = tipY - uy * head;
+        const hw = head * 0.6;
+        const color = SIDE_COLORS[sideIdx % SIDE_COLORS.length];
+        return (
+          <g key={`arrow-${spawn}`} style={{ pointerEvents: "none" }}>
+            <line
+              x1={x1}
+              y1={y1}
+              x2={baseX}
+              y2={baseY}
+              stroke={color}
+              strokeWidth={R * 0.12}
+              strokeLinecap="round"
+            />
+            <polygon
+              points={`${tipX},${tipY} ${baseX - uy * hw},${baseY + ux * hw} ${
+                baseX + uy * hw
+              },${baseY - ux * hw}`}
+              fill={color}
+            />
+          </g>
+        );
+      })}
       {positionNames.map((name) => {
         const p = state.positions[name];
         const use = spawnUse.get(name);
+        const baseFor = baseOf.get(name);
         const isSelected = selected?.name === name;
+        const subLabel = use?.role ?? (baseFor ? "base" : undefined);
 
         // A position outside the map bounds would render off-canvas and be
         // unreachable, so pin it to the nearest edge (flagged) while the modal
@@ -352,6 +407,8 @@ export default function MapStartPos(props: MapStartPosProps) {
           ? "#ff5252"
           : use
           ? SIDE_COLORS[use.sideIdx % SIDE_COLORS.length]
+          : baseFor
+          ? SIDE_COLORS[baseFor.sideIdx % SIDE_COLORS.length]
           : "#8a93a3";
 
         // Shrink the name to fit across the circle if it's long.
@@ -363,7 +420,7 @@ export default function MapStartPos(props: MapStartPosProps) {
               cx={d.x}
               cy={d.y}
               r={R}
-              fill={rgba(color, 0.28)}
+              fill={rgba(color, baseFor ? 0.12 : 0.28)}
               stroke={isSelected ? "#ffffff" : color}
               strokeWidth={isSelected ? R * 0.11 : R * 0.07}
               strokeDasharray={oob ? `${R * 0.22} ${R * 0.16}` : undefined}
@@ -393,11 +450,12 @@ export default function MapStartPos(props: MapStartPosProps) {
             >
               <title>
                 {oob ? `${name} - off map at (${p.x}, ${p.y})` : name}
+                {baseFor ? ` (base of ${baseFor.spawn})` : ""}
               </title>
             </circle>
             <text
               x={d.x}
-              y={use?.role ? d.y - LABEL_SIZE * 0.6 : d.y}
+              y={subLabel ? d.y - LABEL_SIZE * 0.6 : d.y}
               textAnchor="middle"
               dominantBaseline="central"
               fill="#ffffff"
@@ -410,13 +468,13 @@ export default function MapStartPos(props: MapStartPosProps) {
             >
               {name}
             </text>
-            {use?.role && (
+            {subLabel && (
               <text
                 x={d.x}
                 y={d.y + LABEL_SIZE * 0.6}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fill="#ffd54f"
+                fill={use?.role ? "#ffd54f" : "#e0e0e0"}
                 stroke="rgba(0,0,0,0.5)"
                 strokeWidth={LABEL_SIZE * 0.05}
                 paintOrder="stroke"
@@ -424,7 +482,7 @@ export default function MapStartPos(props: MapStartPosProps) {
                 fontWeight={600}
                 style={{ pointerEvents: "none", userSelect: "none" }}
               >
-                {use.role}
+                {subLabel}
               </text>
             )}
           </g>
@@ -474,6 +532,9 @@ export default function MapStartPos(props: MapStartPosProps) {
 
   const selectedPos = selected ? state.positions[selected.name] : null;
   const selectedUse = selected ? spawnUse.get(selected.name) : undefined;
+  const selectedBaseOf = selected
+    ? baseOf.get(selected.name)?.spawn
+    : undefined;
 
   const editorView = (
     <>
@@ -670,6 +731,7 @@ export default function MapStartPos(props: MapStartPosProps) {
             name={selected.name}
             pos={selectedPos}
             use={selectedUse}
+            baseOf={selectedBaseOf}
             teamCount={config?.teamCount ?? 0}
             positionNames={positionNames}
             onRename={(newName) => {
@@ -684,15 +746,24 @@ export default function MapStartPos(props: MapStartPosProps) {
             onSetTeam={(sideIdx) =>
               setState(state.setSpawnTeam(activeConfig, selected.name, sideIdx))
             }
-            onSetStart={(patch) => {
+            onSetRole={(role) => {
               if (selectedUse)
                 setState(
                   state.setStart(
                     activeConfig,
                     selectedUse.sideIdx,
                     selectedUse.startIdx,
-                    patch
+                    { role }
                   )
+                );
+            }}
+            onSetBase={(base) =>
+              setState(state.setBaseCenter(activeConfig, selected.name, base))
+            }
+            onClearBaseOf={() => {
+              if (selectedBaseOf)
+                setState(
+                  state.setBaseCenter(activeConfig, selectedBaseOf, undefined)
                 );
             }}
             onDelete={() => {
@@ -791,12 +862,16 @@ interface PositionEditorProps {
   name: string;
   pos: Position;
   use?: SpawnUse;
+  // Spawn this position is the base center of, in the active config.
+  baseOf?: string;
   teamCount: number;
   positionNames: string[];
   onRename: (newName: string) => void;
   onMove: (pos: Position) => void;
   onSetTeam: (sideIdx: number | null) => void;
-  onSetStart: (patch: { role?: Role; baseCenter?: string }) => void;
+  onSetRole: (role: Role | undefined) => void;
+  onSetBase: (base: string | undefined) => void;
+  onClearBaseOf: () => void;
   onDelete: () => void;
 }
 
@@ -834,9 +909,7 @@ function PositionEditor(props: PositionEditorProps) {
             value={props.use.role ?? ""}
             fullWidth
             onChange={(e) =>
-              props.onSetStart({
-                role: (e.target.value || undefined) as Role | undefined,
-              })
+              props.onSetRole((e.target.value || undefined) as Role | undefined)
             }
           >
             <MenuItem value="">
@@ -859,19 +932,30 @@ function PositionEditor(props: PositionEditorProps) {
                 : ""
             }
             fullWidth
-            onChange={(e) =>
-              props.onSetStart({ baseCenter: e.target.value || undefined })
-            }
+            onChange={(e) => props.onSetBase(e.target.value || undefined)}
           >
             <MenuItem value="">
               <em>none</em>
             </MenuItem>
-            {props.positionNames.map((n) => (
-              <MenuItem key={n} value={n}>
-                {n}
-              </MenuItem>
-            ))}
+            {props.positionNames
+              .filter((n) => n !== props.name)
+              .map((n) => (
+                <MenuItem key={n} value={n}>
+                  {n}
+                </MenuItem>
+              ))}
           </TextField>
+        </Stack>
+      )}
+
+      {props.baseOf && (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography variant="body2" sx={{ flexGrow: 1 }}>
+            Base of <b>{props.baseOf}</b>
+          </Typography>
+          <Button size="small" onClick={props.onClearBaseOf}>
+            Unset
+          </Button>
         </Stack>
       )}
 
