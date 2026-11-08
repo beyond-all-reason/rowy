@@ -10,6 +10,7 @@ import {
   Tooltip,
   IconButton,
   TextField,
+  TextFieldProps,
   MenuItem,
   Dialog,
   DialogTitle,
@@ -229,6 +230,18 @@ export default function MapStartPos(props: MapStartPosProps) {
   );
   const dirty = serialize(state.toStartPos()) !== savedSerialized;
 
+  // Follow the stored value when it changes underneath us (our own save landing
+  // in a still-mounted cell preview, another user, the side drawer), unless
+  // there are unsaved local edits that it would clobber.
+  const propSerialized = serialize(loadStartPos(props.startPos));
+  useEffect(() => {
+    if (propSerialized === savedSerialized || dirty) return;
+    setState(StartPosState.fromStartPos(loadStartPos(props.startPos)));
+    setSavedSerialized(propSerialized);
+    // Only react to the stored value changing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propSerialized]);
+
   function saveEdits() {
     if (!props.updatedStartPos) return;
     const sp = state.toStartPos();
@@ -244,6 +257,16 @@ export default function MapStartPos(props: MapStartPosProps) {
   function applyJson() {
     try {
       const parsed = JSON.parse(jsonDraft ?? "");
+      // loadStartPos coerces anything malformed to an empty document, which
+      // would silently wipe everything on Apply, so reject bad shapes here.
+      const isObj = (v: unknown) =>
+        typeof v === "object" && v !== null && !Array.isArray(v);
+      if (!isObj(parsed))
+        throw new Error("Expected an object with a `positions` key");
+      if (!isObj(parsed.positions))
+        throw new Error("`positions` must be an object of name -> {x, y}");
+      if (parsed.team !== undefined && !Array.isArray(parsed.team))
+        throw new Error("`team` must be an array");
       setState(StartPosState.fromStartPos(loadStartPos(parsed)));
       setJsonDraft(null);
       setJsonError(null);
@@ -655,34 +678,28 @@ export default function MapStartPos(props: MapStartPosProps) {
             <>
               <Divider />
               <Stack direction="row" spacing={1.5} alignItems="center">
-                <TextField
-                  type="number"
-                  size="small"
+                {/* Shrinking the team count drops whole teams, so commit only
+                    on blur/Enter: typing "12" over "2" must not pass via 1. */}
+                <NumberField
                   label="Teams"
                   value={config.teamCount}
-                  onChange={(e) =>
-                    setState(
-                      state.setTeamCount(activeConfig, Number(e.target.value))
-                    )
+                  min={1}
+                  integer
+                  commitOnBlur
+                  onCommit={(n) =>
+                    setState(state.setTeamCount(activeConfig, n))
                   }
                   sx={{ width: 90 }}
-                  inputProps={{ min: 1 }}
                 />
-                <TextField
-                  type="number"
-                  size="small"
+                <NumberField
                   label="Players / team"
                   value={config.playersPerTeam}
-                  onChange={(e) =>
-                    setState(
-                      state.setPlayersPerTeam(
-                        activeConfig,
-                        Number(e.target.value)
-                      )
-                    )
+                  min={1}
+                  integer
+                  onCommit={(n) =>
+                    setState(state.setPlayersPerTeam(activeConfig, n))
                   }
                   sx={{ width: 120 }}
-                  inputProps={{ min: 1 }}
                 />
                 <Typography
                   variant="caption"
@@ -983,23 +1000,15 @@ function PositionEditor(props: PositionEditorProps) {
       )}
 
       <Stack direction="row" spacing={1}>
-        <TextField
-          size="small"
-          type="number"
+        <NumberField
           label="x"
           value={props.pos.x}
-          onChange={(e) =>
-            props.onMove({ x: Number(e.target.value), y: props.pos.y })
-          }
+          onCommit={(x) => props.onMove({ x, y: props.pos.y })}
         />
-        <TextField
-          size="small"
-          type="number"
+        <NumberField
           label="y"
           value={props.pos.y}
-          onChange={(e) =>
-            props.onMove({ x: props.pos.x, y: Number(e.target.value) })
-          }
+          onCommit={(y) => props.onMove({ x: props.pos.x, y })}
         />
       </Stack>
 
@@ -1012,5 +1021,58 @@ function PositionEditor(props: PositionEditorProps) {
         Delete position
       </Button>
     </Stack>
+  );
+}
+
+interface NumberFieldProps {
+  label: string;
+  value: number;
+  onCommit: (n: number) => void;
+  min?: number;
+  integer?: boolean;
+  // Commit only on blur/Enter instead of on every valid keystroke.
+  commitOnBlur?: boolean;
+  sx?: TextFieldProps["sx"];
+}
+
+// Numeric input that keeps its own text draft, so clearing the field or typing
+// an intermediate value ("" / "-") never commits a bogus 0 to the state.
+function NumberField(props: NumberFieldProps) {
+  const [draft, setDraft] = useState(String(props.value));
+  useEffect(() => setDraft(String(props.value)), [props.value]);
+
+  const parse = (text: string): number | null => {
+    if (text.trim() === "") return null;
+    const n = Number(text);
+    if (!Number.isFinite(n)) return null;
+    if (props.integer && !Number.isInteger(n)) return null;
+    if (props.min !== undefined && n < props.min) return null;
+    return n;
+  };
+
+  const commit = () => {
+    const n = parse(draft);
+    if (n !== null && n !== props.value) props.onCommit(n);
+    else setDraft(String(props.value));
+  };
+
+  return (
+    <TextField
+      type="number"
+      size="small"
+      label={props.label}
+      value={draft}
+      error={parse(draft) === null}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        if (props.commitOnBlur) return;
+        const n = parse(e.target.value);
+        if (n !== null) props.onCommit(n);
+      }}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === "Enter" && commit()}
+      sx={props.sx}
+      inputProps={{ min: props.min, step: props.integer ? 1 : undefined }}
+    />
   );
 }
