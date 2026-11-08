@@ -59,6 +59,8 @@ export type UserSettings = Partial<{
     }>
   >;
 
+  refreshTime: number;
+
   /** Stores table tutorial completion */
   tableTutorialComplete?: boolean;
 }>;

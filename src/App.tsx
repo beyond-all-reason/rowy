@@ -5,6 +5,7 @@ import { useAtom } from "jotai";
 import { Backdrop } from "@mui/material";
 import Loading from "@src/components/Loading";
 import ProjectSourceFirebase from "@src/sources/ProjectSourceFirebase";
+import RefreshAuth from "@src/sources/RefreshAuth";
 import MembersSourceFirebase from "@src/sources/MembersSourceFirebase";
 import ConfirmDialog from "@src/components/ConfirmDialog";
 import RowyRunModal from "@src/components/RowyRunModal";
@@ -69,6 +70,7 @@ export default function App() {
   return (
     <Suspense fallback={<Loading fullScreen />}>
       <ProjectSourceFirebase />
+      <RefreshAuth />
       {userRoles.includes("ADMIN") && <MembersSourceFirebase />}
       <ConfirmDialog />
       <RowyRunModal />
